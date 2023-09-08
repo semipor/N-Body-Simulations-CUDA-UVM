@@ -20,17 +20,27 @@ void writeRender(char* data, float* hdImage, int step);
 int main()
 {
 	std::cout << SYSTEM_THICKNESS << "AU thick disk\n";;
-	char *image = new char[WIDTH*HEIGHT*3];
-	float *hdImage = new float[WIDTH*HEIGHT*3];
+	char *image;
+	cudaMallocManaged((void**)&image, sizeof(char)*WIDTH*HEIGHT*3);
+	float *hdImage;
+	cudaMallocManaged((void**)&image, sizeof(fload)*WIDTH*HEIGHT*3);
 	//struct body *bodies = new struct body[NUM_BODIES];
 	
-	float* xpos = new float[NUM_BODIES];
-	float* ypos = new float[NUM_BODIES];
-	float* zpos = new float[NUM_BODIES];
-	float* xvel = new float[NUM_BODIES];
-	float* yvel = new float[NUM_BODIES];
-	float* zvel = new float[NUM_BODIES];
-	float* mass = new float[NUM_BODIES];
+	float* xpos;
+	float* ypos;
+	float* zpos;
+	float* xvel;
+	float* yvel;
+	float* zvel;
+	float* mass;
+	cudaMallocManaged((void**)&xpos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&ypos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&zpos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&xvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&yvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&zvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged((void**)&mass, sizeof(float)*NUM_BODIES);
+
 	initializeBodies(xpos,ypos,zpos,xvel,yvel,zvel,mass);
 	runSimulation(xpos,ypos,zpos,xvel,yvel,zvel,mass, image, hdImage);
 	std::cout << "\nwe made it\n";
@@ -84,28 +94,16 @@ void initializeBodies(float* xpos, float* ypos, float* zpos, float* xvel, float*
 
 void runSimulation(float* xpos, float* ypos, float* zpos, float* xvel, float* yvel, float* zvel, float* mass, char* image, float* hdImage)
 {
-	float *d_xpos;	float *d_ypos;	float *d_zpos;	float *d_xvel;	float *d_yvel;	float *d_zvel;	float *d_mass;	char *d_image;	float *d_hdImage;
 	float *Fx; float *Fy; float* Fz;
-	cudaMalloc(&d_xpos,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_ypos,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_zpos,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_xvel,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_yvel,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_zvel,NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_mass,NUM_BODIES*sizeof(float));
-	cudaMalloc(&Fx, NUM_BODIES*sizeof(float));
-	cudaMalloc(&Fy, NUM_BODIES*sizeof(float));
-	cudaMalloc(&Fz, NUM_BODIES*sizeof(float));
-	cudaMalloc(&d_image,WIDTH*HEIGHT*3*sizeof(char));
-	cudaMalloc(&d_hdImage,WIDTH*HEIGHT*3*sizeof(float));
+	cudaMallocManaged(&Fx, NUM_BODIES*sizeof(float));
+	cudaMallocManaged(&Fy, NUM_BODIES*sizeof(float));
+	cudaMallocManaged(&Fz, NUM_BODIES*sizeof(float));
 	int nBlocks=(NUM_BODIES+1024-1)/1024;
 	long nsqrBlocks=(NUM_BODIES/1024)*(NUM_BODIES/1024);
 	dim3 grid(nsqrBlocks,1024,1);
 	//createFirstFrame
 	renderClear(image, hdImage);
-	cudaMemcpy(d_hdImage,hdImage,WIDTH*HEIGHT*3*sizeof(float),cudaMemcpyHostToDevice);
-	GPUrenderBodies<<<nBlocks+1,1024>>>(d_xpos,d_ypos,d_zpos,d_xvel,d_yvel,d_zvel,d_mass,d_hdImage);
-	cudaMemcpy(hdImage,d_hdImage,WIDTH*HEIGHT*3*sizeof(float),cudaMemcpyDeviceToHost);
+	GPUrenderBodies<<<nBlocks+1,1024>>>(xpos,ypos,zpos,xvel,yvel,zvel,mass,hdImage);
 	writeRender(image, hdImage, 1);
 	
 	for (int step=1; step<STEP_COUNT; step++)
@@ -123,7 +121,7 @@ void runSimulation(float* xpos, float* ypos, float* zpos, float* xvel, float* yv
 		clearF<<<nBlocks+1,1024>>>(Fx,Fy,Fz);
 		cudaDeviceSynchronize();
 		
-		interactn2<<<grid,1024>>>(d_xpos,d_ypos,d_zpos,d_xvel,d_yvel,d_zvel,d_mass,Fx,Fy,Fz);
+		interactn2<<<grid,1024>>>(xpos,ypos,zpos,xvel,yvel,zvel,mass,Fx,Fy,Fz);
 		cudaDeviceSynchronize();
 		cudaError_t error = cudaGetLastError();
 		if(error!=cudaSuccess)
@@ -132,14 +130,6 @@ void runSimulation(float* xpos, float* ypos, float* zpos, float* xvel, float* yv
 		}
 		updateAll<<<nBlocks+1,1024>>>(d_xpos,d_ypos,d_zpos,d_xvel,d_yvel,d_zvel,d_mass,Fx,Fy,Fz);
 		printf("EndK\n");
-		cudaMemcpy( xpos,d_xpos, NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( ypos, d_ypos,NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( zpos,d_zpos, NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( xvel,d_xvel, NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( yvel,d_yvel, NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( zvel,d_zvel, NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy( mass, d_mass,NUM_BODIES*sizeof(float), cudaMemcpyDeviceToHost);
-		//printf("EndK2\n");
 
 		if (step%RENDER_INTERVAL==0)
 		{
@@ -148,10 +138,8 @@ void runSimulation(float* xpos, float* ypos, float* zpos, float* xvel, float* yv
 			renderClear(image, hdImage);
 			if (DEBUG_INFO) {std::cout << "\nRendering Particles..." << std::flush;}
 			//renderBodies(pos, vel, hdImage);
-			cudaMemcpy(d_hdImage,hdImage,WIDTH*HEIGHT*3*sizeof(float),cudaMemcpyHostToDevice);
 			GPUrenderBodies<<<nBlocks+1,1024>>>(d_xpos,d_ypos,d_zpos,d_xvel,d_yvel,d_zvel,d_mass,d_hdImage);
 			cudaDeviceSynchronize();
-			cudaMemcpy(hdImage,d_hdImage,WIDTH*HEIGHT*3*sizeof(float),cudaMemcpyDeviceToHost);
 			if (DEBUG_INFO) {std::cout << "\nWriting frame to file..." << std::flush;}
 			writeRender(image, hdImage, step);
 		}
