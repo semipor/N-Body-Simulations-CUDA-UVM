@@ -31,13 +31,11 @@ int main()
 	std::cout << SYSTEM_THICKNESS << "AU thick disk\n";;
 	char *image = new char[WIDTH*HEIGHT*3];
 	double *hdImage = new double[WIDTH*HEIGHT*3];
-	struct body *bodies = new struct body[NUM_BODIES];
-	struct body *d_bodies;
-	cudaMalloc(&d_bodies,NUM_BODIES*sizeof(struct body));
+	struct body *bodies;
+	cudaMallocManaged((void**)&bodies,NUM_BODIES*sizeof(struct body));
 	
 	initializeBodies(bodies);
-	cudaMemcpy(d_bodies,bodies,NUM_BODIES*sizeof(struct body),cudaMemcpyHostToDevice);
-	runSimulation(bodies, d_bodies, image, hdImage);
+	runSimulation(bodies, image, hdImage);
 	std::cout << "\nwe made it\n";
 	delete[] bodies;
 	delete[] image;
@@ -91,18 +89,17 @@ void initializeBodies(struct body* bods)
 			  << "\n______________________________\n";
 }
 
-void runSimulation(struct body* b, struct body* db, char* image, double* hdImage)
+void runSimulation(struct body* b, char* image, double* hdImage)
 {
 	createFrame(image, hdImage, b, 1);
 	printf("here (done with createFrame1)");
 	for (int step=1; step<STEP_COUNT; step++)
 	{
 		std::cout << "\nBeginning timestep: " << step;
-		interactBodies<<<1,1>>>(db);
+		interactBodies<<<1,1>>>(b);
 		cudaError_t error = cudaGetLastError();
                         if(error!=cudaSuccess)
                                 printf("\nCUDA error:%s",cudaGetErrorString(error));
-		cudaMemcpy(b,db,NUM_BODIES*sizeof(struct body),cudaMemcpyDeviceToHost);
 		if (step%RENDER_INTERVAL==0)
 		{
 			createFrame(image, hdImage, b, step + 1);
