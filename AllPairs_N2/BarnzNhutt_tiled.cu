@@ -26,12 +26,16 @@ __global__ void update(float4* pos, float4* vel, float4* Fi);
 
 int main()
 {
-	std::cout << SYSTEM_THICKNESS << "AU thick disk\n";;
-	char *image = new char[WIDTH*HEIGHT*3];
-	float *hdImage = new float[WIDTH*HEIGHT*3];
+	std::cout << SYSTEM_THICKNESS << "AU thick disk\n";
+	char *image;
+	cudaMallocManaged((void**)image, sizeof(char)*WIDTH*HEIGHT*3);
+	float *hdImage;
+	cudaMallocManaged((void**)hdImage, sizeof(float)*WIDTH*HEIGHT*3);
 	//struct body *bodies = new struct body[NUM_BODIES];
-	float4* pos = new float4[NUM_BODIES];
-	float4* vel = new float4[NUM_BODIES];
+	float4* pos;
+	float4* vel;
+	cudaMallocManaged((void**)pos, sizeof(float4)*NUM_BODIES);
+	cudaMallocManaged((void**)vel, sizeof(float4)*NUM_BODIES);
 	initializeBodies(pos,vel);
 	runSimulation(pos,vel, image, hdImage);
 	std::cout << "\nwe made it\n";
@@ -87,38 +91,28 @@ void initializeBodies(float4* pos, float4* vel)
 void runSimulation(float4* pos, float4* vel, char* image, float* hdImage)
 {
 	createFrame(image, hdImage, pos,vel, 1);
-	float4 *d_pos;
-	float4 *d_vel;
 	float4 *d_acc;
-	cudaMalloc(&d_pos,NUM_BODIES*sizeof(float4));
-	cudaMalloc(&d_vel,NUM_BODIES*sizeof(float4));
-	cudaMalloc(&d_acc,NUM_BODIES*sizeof(float4));
+	cudaMallocManaged(&d_acc,NUM_BODIES*sizeof(float4));
 	
 	int nBlocks=(NUM_BODIES+TILE-1)/TILE;
 	for (int step=1; step<STEP_COUNT; step++)
 	{
 		std::cout << "\nBeginning timestep: " << step;
-		printf("\nStartK\n");
-		cudaMemcpy(d_pos, pos, NUM_BODIES*sizeof(float4), cudaMemcpyHostToDevice);
-		cudaMemcpy(d_vel, vel, NUM_BODIES*sizeof(float4), cudaMemcpyHostToDevice);
-		printf("StartK1\n");	
+		printf("StartK\n");	
 		//interactBodies<<<nBlocks,1024>>>(d_pos,d_vel);
-		calculate_forces<<<nBlocks,TILE,TILE*sizeof(float4)>>>(d_pos,d_acc);
+		calculate_forces<<<nBlocks,TILE,TILE*sizeof(float4)>>>(pos,acc);
 		cudaDeviceSynchronize();
 		cudaError_t error = cudaGetLastError();
 		if(error!=cudaSuccess)
 		{
 			printf("CUDA error:%s\n",cudaGetErrorString(error));
 		}
-		update<<<nBlocks,TILE>>>(d_pos,d_vel,d_acc);
+		update<<<nBlocks,TILE>>>(pos,vel,d_acc);
 		cudaDeviceSynchronize();
 		error=cudaGetLastError();
 		if(error!=cudaSuccess)
 			printf("CUDA error:%s\n",cudaGetErrorString(error));
 		printf("EndK\n");
-		cudaMemcpy( pos,d_pos, NUM_BODIES*sizeof(float4), cudaMemcpyDeviceToHost);
-		cudaMemcpy( vel, d_vel,NUM_BODIES*sizeof(float4), cudaMemcpyDeviceToHost);
-		printf("EndK2\n");
 
 		if (step%RENDER_INTERVAL==0)
 		{
