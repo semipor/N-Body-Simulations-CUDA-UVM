@@ -18,9 +18,9 @@ int main()
 {
 	std::cout << SYSTEM_THICKNESS << "AU thick disk\n";
 	char *image;
-	cudaMallocManaged((void**)&image, sizeof(char)*WIDTH*HEIGHT*3);
+	cudaMallocManaged(&image, sizeof(char)*WIDTH*HEIGHT*3);
 	float *hdImage;
-	cudaMallocManaged((void**)&image, sizeof(fload)*WIDTH*HEIGHT*3);
+	cudaMallocManaged(&image, sizeof(float)*WIDTH*HEIGHT*3);
 	//struct body *bodies = new struct body[NUM_BODIES];
 	
 	float* xpos;
@@ -30,13 +30,13 @@ int main()
 	float* yvel;
 	float* zvel;
 	float* mass;
-	cudaMallocManaged((void**)&xpos, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&ypos, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&zpos, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&xvel, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&yvel, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&zvel, sizeof(float)*NUM_BODIES);
-	cudaMallocManaged((void**)&mass, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&xpos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&ypos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&zpos, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&xvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&yvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&zvel, sizeof(float)*NUM_BODIES);
+	cudaMallocManaged(&mass, sizeof(float)*NUM_BODIES);
 	initializeBodies(xpos,ypos,zpos,xvel,yvel,zvel,mass);
 	runSimulation(xpos,ypos,zpos,xvel,yvel,zvel,mass, image, hdImage);
 	std::cout << "\nwe made it\n";
@@ -173,10 +173,9 @@ void renderClear(char* image, float* hdImage)
 __global__ void GPUrenderBodies(float* xpos, float* ypos, float* zpos, float* xvel, float* yvel, float* zvel, float* mass, float* hdImage)
 {
 	/// ORTHOGONAL PROJECTION
-	int i = blockIdx.x*blockDim.x+threadIdx.x;
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	float velocityMax = MAX_VEL_COLOR; //35000
-	float velocityMin = sqrt(0.8*(G*(SOLAR_MASS+EXTRA_MASS*SOLAR_MASS))/
-				(SYSTEM_SIZE*TO_METERS)); //MIN_VEL_COLOR;
+	float velocityMin = sqrt(0.8*(G*(SOLAR_MASS+EXTRA_MASS*SOLAR_MASS))/(SYSTEM_SIZE*TO_METERS)); //MIN_VEL_COLOR;
 	if(i<NUM_BODIES)
 	{
 		float vxsqr=xvel[i]*xvel[i];
@@ -202,7 +201,6 @@ __global__ void GPUrenderBodies(float* xpos, float* ypos, float* zpos, float* xv
 				for (int b=-DOT_SIZE/2; b<DOT_SIZE/2; b++)
 				{
 					float cFactor = PARTICLE_BRIGHTNESS /(pow(exp(pow(PARTICLE_SHARPNESS*(xP+a-xPixel),2.0)) + exp(pow(PARTICLE_SHARPNESS*(yP+b-yPixel),2.0)),/*1.25*/0.75)+1.0);
-					//colorAt(int(xP+a),int(yP+b),c, cFactor, hdImage);
 					int pix = 3*(xP+a+WIDTH*(yP+b));
 					hdImage[pix+0] += c.r*cFactor;
 					hdImage[pix+1] += c.g*cFactor;
