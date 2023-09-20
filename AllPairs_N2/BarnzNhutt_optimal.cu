@@ -20,7 +20,7 @@ int main()
 	char *image;
 	cudaMallocManaged(&image, sizeof(char)*WIDTH*HEIGHT*3);
 	float *hdImage;
-	cudaMallocManaged(&image, sizeof(float)*WIDTH*HEIGHT*3);
+	cudaMallocManaged(&hdImage, sizeof(float)*WIDTH*HEIGHT*3);
 	//struct body *bodies = new struct body[NUM_BODIES];
 	
 	float* xpos;
@@ -37,6 +37,7 @@ int main()
 	cudaMallocManaged(&yvel, sizeof(float)*NUM_BODIES);
 	cudaMallocManaged(&zvel, sizeof(float)*NUM_BODIES);
 	cudaMallocManaged(&mass, sizeof(float)*NUM_BODIES);
+	printf("MallocManaged successed");
 	initializeBodies(xpos,ypos,zpos,xvel,yvel,zvel,mass);
 	runSimulation(xpos,ypos,zpos,xvel,yvel,zvel,mass, image, hdImage);
 	std::cout << "\nwe made it\n";
